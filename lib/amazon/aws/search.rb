@@ -289,7 +289,7 @@ module Amazon
 	# If a block is passed to this method, each successive page of results
 	# will be yielded to the block.
 	#
-	def search(operation, nr_pages=1)
+	def search(operation, nr_pages = 1, page_number = 1)
 	  parameters = Amazon::AWS::SERVICE.
 			 merge( { 'AWSAccessKeyId' => @key_id,
 				  'AssociateTag'   => @tag } ).
@@ -309,7 +309,17 @@ module Amazon
 	  #
 	  parameters.merge!( { 'Version' => @api } ) if @api
 
-	  @query = Amazon::AWS.assemble_query( parameters, @encoding )
+	  if PAGINATION.key? operation.kind
+	    page_parameter = PAGINATION[operation.kind]['parameter']
+	    max_pages = PAGINATION[operation.kind]['max_page']
+	  else
+	    page_parameter = 'ItemPage'
+	    max_pages = 400
+	  end
+    
+	  @query = Amazon::AWS.assemble_query(
+	      parameters.merge( { page_parameter => page_number } ),
+	      @encoding )
 	  page = Amazon::AWS.get_page( self )
 
 	  # Ruby 1.9 needs to know that the page is UTF-8, not ASCII-8BIT.
@@ -405,14 +415,6 @@ module Amazon
 	  # Limit the number of pages to the maximum number available.
 	  #
 	  nr_pages = tp.to_i if nr_pages == :ALL_PAGES || nr_pages > tp.to_i
-
-	  if PAGINATION.key? operation.kind
-	    page_parameter = PAGINATION[operation.kind]['parameter']
-	    max_pages = PAGINATION[operation.kind]['max_page']
-	  else
-	    page_parameter = 'ItemPage'
-	    max_pages = 400
-	  end
 
 	  # Iterate over pages 2 and higher, but go no higher than MAX_PAGES.
 	  #
